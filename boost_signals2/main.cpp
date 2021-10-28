@@ -27,7 +27,8 @@ public:
 int main() {
   Sender<int> sender;
   Receiver<int> receiver(std::cout);
-  boost::signals2::connection c = sender.m_foo.connect(
+  boost::signals2::connection c;
+  c = sender.m_foo.connect(
       std::bind(&decltype(receiver)::receive, &receiver, std::placeholders::_1));
   sender.send(100);
   sender.send(20);

@@ -7,7 +7,7 @@
 #include <string>
 
 int main() {
-    const icu::UnicodeString s{"你好 世界"};
+    const icu::UnicodeString s{"你好 世界\thello"};
     // by index
     {
         std::cout << "Length of s = " << s.length() << std::endl;
@@ -30,14 +30,14 @@ int main() {
     }
     // split
     {
-        const icu::UnicodeString pattern{" "};
+        const icu::UnicodeString pattern{"\\s"};
         UErrorCode error_code = U_ZERO_ERROR;
         icu::RegexMatcher matcher(pattern, URegexpFlag::UREGEX_ERROR_ON_UNKNOWN_ESCAPES, error_code);
         if (U_FAILURE(error_code)) {
             std::cerr << "Error of building pattern: " << u_errorName(error_code) << std::endl;
             return 1;
         }
-        const int num_fields = 2;
+        const int num_fields = 3;
         icu::UnicodeString fields[num_fields];
         const int actual_num_fields = matcher.split(s, fields, num_fields, error_code);
         if (U_FAILURE(error_code)) {

@@ -23,11 +23,18 @@ def main():
     # load model
     model = load_model('best_encoder_model/')
     # encode data
-    nn_output_data = model(data[CVs].to_numpy())
+    x = tf.Variable(tf.convert_to_tensor(data[CVs].to_numpy()))
+    with tf.GradientTape() as tape:
+        tape.watch(x)
+        nn_output_data = model(x)
+    grad = tape.gradient(nn_output_data, x)
+    print(grad)
     # save encoded data
     print(nn_output_data)
     nn_output_data_df = pd.DataFrame(nn_output_data)
     nn_output_data_df.columns = ['committor']
+    nn_output_data_df['grad_x'] = grad.numpy()[:, 0]
+    nn_output_data_df['grad_y'] = grad.numpy()[:, 1]
     nn_output_data_df.to_csv('encoded_py.csv', index=False)
 
 

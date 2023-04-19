@@ -8,6 +8,7 @@
 #include <tensorflow/core/public/session.h>
 #include <tensorflow/core/platform/status.h>
 #include <tensorflow/cc/framework/ops.h>
+#include <tensorflow/c/eager/tape.h>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <re2/re2.h>
@@ -106,6 +107,20 @@ void write_2d_tensor_to_file(const std::string& output_filename, const tensorflo
   }
 }
 
+void inspect_model(const tensorflow::SavedModelBundleInterface& model) {
+  const auto& signature = model.GetSignatures();
+  for (auto it = signature.begin(); it != signature.end(); ++it) {
+    const auto& signature_def = it->second;
+    std::cout << "Signature: " << it->first << '\n';
+    for (auto it_sig = signature_def.inputs().begin(); it_sig != signature_def.inputs().end(); ++it_sig) {
+      std::cout << "  input: " << it_sig->first << " (internal name: " << it_sig->second.name() << ")" << '\n';
+    }
+    for (auto it_sig = signature_def.outputs().begin(); it_sig != signature_def.outputs().end(); ++it_sig) {
+      std::cout << "  output: " << it_sig->first << " (internal name: " << it_sig->second.name() << ")" << '\n';
+    }
+  }
+}
+
 int main() {
   const std::string model_dir{"best_encoder_model/"};
   tensorflow::SavedModelBundleLite bundle;
@@ -114,6 +129,7 @@ int main() {
     {tensorflow::kSavedModelTagServe}, &bundle);
   if (status.ok()) {
     std::cout << "Load OK\n";
+    inspect_model(bundle);
     const auto input_tensor = vector_to_tensor_2d(read_gzipped_csv("dx0.1_dy1.0.csv.gz"));
     const auto session = bundle.GetSession();
     std::vector<tensorflow::Tensor> output;

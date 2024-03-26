@@ -1,21 +1,28 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(example-app)
+project(example-app LANGUAGES CXX)
 
+find_package(CUDAToolkit)
 find_package(Torch REQUIRED)
+find_package(fmt REQUIRED)
+
+include(CheckLanguage)
+check_language(CUDA)
+
+if(NOT DEFINED CMAKE_CUDA_STANDARD)
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-add_executable(example-app src/main.cpp)
-target_link_libraries(example-app "${TORCH_LIBRARIES}")
-set_property(TARGET example-app PROPERTY CXX_STANDARD 20)
+#add_executable(example-app src/misc.cpp)
+#target_link_libraries(example-app "${TORCH_LIBRARIES}")
+#set_property(TARGET example-app PROPERTY CXX_STANDARD 20)
 
-# The following code block is suggested to be used on Windows.
-# According to https://github.com/pytorch/pytorch/issues/25457,
-# the DLLs need to be copied to avoid memory errors.
-if (MSVC)
-  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
-  add_custom_command(TARGET example-app
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     ${TORCH_DLLS}
-                     $<TARGET_FILE_DIR:example-app>)
-endif (MSVC)
+add_executable(cuda_torch
+               src/cuda_torch.cu
+               src/cuda_torch.h
+               src/helper_string.h
+               src/cuda_torch_example.cpp)
+target_link_libraries(cuda_torch "${TORCH_LIBRARIES}" fmt CUDA::cudart CUDA::cupti)
+set_property(TARGET cuda_torch PROPERTY LANGUAGE CUDA)

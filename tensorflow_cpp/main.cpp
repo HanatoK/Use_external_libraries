@@ -21,6 +21,30 @@
 #include <stdexcept>
 #include <iomanip>
 
+#include "gradients.h"
+#include "tensorflow/c/eager/abstract_tensor_handle.h"
+
+namespace tensorflow {
+class TFTensorHandle: public tensorflow::AbstractTensorHandle {
+public:
+  TFTensorHandle(tensorflow::Tensor& tensor, AbstractTensorHandleKind kind):
+    tensorflow::AbstractTensorHandle(kind), m_tensor(tensor) {}
+  virtual tensorflow::DataType DataType() const override {
+    return m_tensor.dtype();
+  }
+  virtual tensorflow::Status Shape(tensorflow::PartialTensorShape* shape) const override {
+    const int num_dims = m_tensor.dims();
+    std::vector<int> dims(num_dims);
+    for (int i = 0; i < num_dims; ++i) {
+      dims[i] = m_tensor.dim_size(i);
+    }
+    return PartialTensorShape::MakePartialShape(dims.data(), num_dims, shape);
+  }
+protected:
+  tensorflow::Tensor& m_tensor;
+};
+}
+
 std::vector<std::string_view> splitString(std::string_view s, const re2::RE2& re) {
     std::vector<std::string_view> results;
     if (re.ok()) {

@@ -9,20 +9,24 @@
 
 void execute_python_code(
   PyInterpreterConfig config, const std::string& module_name, const std::string& func_name, std::mutex& print_mutex) {
-  PyThreadState *tstate = NULL;
-  PyStatus status = Py_NewInterpreterFromConfig(&tstate, &config);
-  if (PyStatus_Exception(status)) {
+  const auto currentDir = std::filesystem::current_path();
+  // PyGILState_STATE gstate;
+  // interpreter 1
+  PyThreadState *tstate1 = NULL;
+  // gstate = PyGILState_Ensure();
+  PyStatus status1 = Py_NewInterpreterFromConfig(&tstate1, &config);
+  if (PyStatus_Exception(status1)) {
     std::cout << "Failed\n";
     return;
   }
-  const auto currentDir = std::filesystem::current_path();
-  PyThreadState_Swap(tstate);
+  PyThreadState_Swap(tstate1);
   PyObject *sysPath = PySys_GetObject("path");
   PyList_Append(sysPath, PyUnicode_FromString(currentDir.c_str()));
   PyObject* myModule = PyImport_ImportModule(module_name.c_str());
   PyErr_Print();
   PyObject* myFunction = PyObject_GetAttrString(myModule, func_name.c_str());
   PyObject* res = PyObject_CallObject(myFunction, NULL);
+  // PyGILState_Release(gstate);
   if (res) {
     const int x = (int)PyLong_AsLong(res);
     {
@@ -30,7 +34,35 @@ void execute_python_code(
       std::cerr << "C++ thread id = " << gettid() << ", python result = " << x << std::endl;
     }
   }
-  Py_EndInterpreter(tstate);
+  // interpreter 2
+  PyThreadState *tstate2 = NULL;
+  // gstate = PyGILState_Ensure();
+  PyStatus status2 = Py_NewInterpreterFromConfig(&tstate2, &config);
+  if (PyStatus_Exception(status2)) {
+    std::cout << "Failed\n";
+    return;
+  }
+  PyThreadState_Swap(tstate2);
+  sysPath = PySys_GetObject("path");
+  PyList_Append(sysPath, PyUnicode_FromString(currentDir.c_str()));
+  myModule = PyImport_ImportModule(module_name.c_str());
+  PyErr_Print();
+  myFunction = PyObject_GetAttrString(myModule, func_name.c_str());
+  res = PyObject_CallObject(myFunction, NULL);
+  // PyGILState_Release(gstate);
+  if (res) {
+    const int x = (int)PyLong_AsLong(res);
+    {
+      std::lock_guard<std::mutex> guard(print_mutex);
+      std::cerr << "C++ thread id = " << gettid() << ", python result = " << x << std::endl;
+    }
+  }
+  // destroy interpreter 1
+  PyThreadState_Swap(tstate1);
+  Py_EndInterpreter(tstate1);
+  // destroy interpreter 2
+  PyThreadState_Swap(tstate2);
+  Py_EndInterpreter(tstate2);
 }
 
 int main(int argc, char* argv[]) {

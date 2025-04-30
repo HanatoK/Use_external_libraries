@@ -143,6 +143,7 @@ void call_from_thread(int tid, int num_threads, my_data& data_in) {
   checkCudaError(cudaFreeHost(h_cog));
   checkCudaError(cudaFree(d_points));
   checkCudaError(cudaFree(d_cog));
+  checkCudaError(cudaFree(d_count));
   checkCudaError(cudaStreamDestroy(stream));
   sync_host_threads->wait();
 }

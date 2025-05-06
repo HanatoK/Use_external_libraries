@@ -5,7 +5,7 @@
 #include <string>
 #include <filesystem>
 #include "unistd.h"
-#include "python3.12/Python.h"
+#include "Python.h"
 
 void execute_python_code(
   PyInterpreterConfig config, const std::string& module_name, const std::string& func_name, std::mutex& print_mutex) {
@@ -16,6 +16,7 @@ void execute_python_code(
   // gstate = PyGILState_Ensure();
   PyStatus status1 = Py_NewInterpreterFromConfig(&tstate1, &config);
   if (PyStatus_Exception(status1)) {
+    Py_ExitStatusException(status1);
     std::cout << "Failed\n";
     return;
   }
@@ -81,8 +82,13 @@ int main(int argc, char* argv[]) {
   } else {
     pymodule = "gettid";
   }
-  Py_Initialize();
+  Py_InitializeEx(0);
   PyInterpreterConfig config = {
+    .use_main_obmalloc = 0,
+    .allow_fork = 0,
+    .allow_exec = 0,
+    .allow_threads = 1,
+    .allow_daemon_threads = 0,
     .check_multi_interp_extensions = 1,
     .gil = PyInterpreterConfig_OWN_GIL,
   };

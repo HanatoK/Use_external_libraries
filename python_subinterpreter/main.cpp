@@ -94,6 +94,7 @@ int main(int argc, char* argv[]) {
   };
   const int num_threads = 4;
   std::vector<std::thread> threads;
+  PyThreadState* save_tstate = PyThreadState_Swap(NULL);
   for (int i = 0; i < num_threads; ++i) {
     threads.emplace_back(
       execute_python_code, config, pymodule, pyfuncname, std::ref(print_mutex));
@@ -101,6 +102,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < num_threads; ++i) {
     threads[i].join();
   }
+  PyThreadState_Swap(save_tstate);
   int status_exit = Py_FinalizeEx();
   std::cout << "status_exit: " << status_exit << std::endl;
   return 0;

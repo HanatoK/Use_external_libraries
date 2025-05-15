@@ -91,8 +91,8 @@ void print_with_lock(const std::string& str, const bool flush = true) {
 }
 
 void call_from_thread(int tid, int num_threads, my_data& data_in, sycl::device dev) {
-  const auto backend = dev.get_backend();
-  sycl::queue thread_queue(dev);
+  // const auto backend = dev.get_backend();
+  sycl::queue thread_queue(dev, sycl::property_list{sycl::property::queue::in_order{}});
   int work_size = data_in.points.size() / num_threads;
   const int my_work_start = tid * work_size;
   if (tid == num_threads - 1) {
@@ -187,16 +187,16 @@ void call_from_thread(int tid, int num_threads, my_data& data_in, sycl::device d
     thread_queue.wait();
     sync_host_threads->wait();
   }
-  if (true /*backend == sycl::backend::ext_oneapi_cuda*/) {
-    // TODO: I don't know why
-    thread_queue.wait();
-  }
+  // if (true /*backend == sycl::backend::ext_oneapi_cuda*/) {
+  //   // TODO: I don't know why
+  //   thread_queue.wait();
+  // }
   thread_queue.memset(d_cog, 0, sycl::double3::byte_size());
   sum_cog_from_devices(data_in.h_thread_cogs, d_cog, tid, num_threads, &thread_queue);
-  if (true /*backend == sycl::backend::ext_oneapi_cuda*/) {
-    // TODO: I don't know why
-    thread_queue.wait();
-  }
+  // if (true /*backend == sycl::backend::ext_oneapi_cuda*/) {
+  //   // TODO: I don't know why
+  //   thread_queue.wait();
+  // }
   thread_queue.memcpy(h_cog, d_cog, sycl::double3::byte_size());
   thread_queue.wait();
   h_cog->x() /= data_in.points.size();

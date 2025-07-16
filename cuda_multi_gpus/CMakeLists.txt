@@ -17,5 +17,5 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 add_executable(${CMAKE_PROJECT_NAME} mgpu.cpp mgpu_kernel.cuh mgpu_kernel.cu)
-target_link_libraries(${CMAKE_PROJECT_NAME} CUDA::cudart CUDA::nvToolsExt)
+target_link_libraries(${CMAKE_PROJECT_NAME} CUDA::cudart CUDA::nvtx3)
 set_property(TARGET ${CMAKE_PROJECT_NAME} PROPERTY LANGUAGE CUDA)

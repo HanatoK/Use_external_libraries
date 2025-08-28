@@ -64,16 +64,20 @@ void run_test_derivatie_cpu(const size_t N = 100000, const int M = 20) {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::micro> diff1 = end - start;
     // std::cout << fmt::format("Iteration {}: project1: {} {} {} {}\n", j, dq1[0], dq1[1], dq1[2], dq1[3]);
-    project1_time += diff1.count();
-    project1_time_sq += diff1.count() * diff1.count();
+    if (j > 0) {
+      project1_time += diff1.count();
+      project1_time_sq += diff1.count() * diff1.count();
+    }
 
     start = std::chrono::high_resolution_clock::now();
     const auto dq2 = project2(q, points, forces);
     end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::micro> diff2 = end - start;
     // std::cout << fmt::format("Iteration {}: Project2: {} {} {} {}\n", j, dq2[0], dq2[1], dq2[2], dq2[3]);
-    project2_time += diff2.count();
-    project2_time_sq += diff2.count() * diff2.count();
+    if (j > 0) {
+      project2_time += diff2.count();
+      project2_time_sq += diff2.count() * diff2.count();
+    }
 
     const double error = std::sqrt(
       (dq1[0] - dq2[0]) * (dq1[0] - dq2[0]) +
@@ -84,10 +88,10 @@ void run_test_derivatie_cpu(const size_t N = 100000, const int M = 20) {
       max_error = error;
     }
   }
-  const double project1_time_stddev = std::sqrt(project1_time_sq / M - (project1_time / M) * (project1_time / M));
-  const double project2_time_stddev = std::sqrt(project2_time_sq / M - (project2_time / M) * (project2_time / M));
-  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / M, project1_time_stddev);
-  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / M, project2_time_stddev);
+  const double project1_time_stddev = std::sqrt(project1_time_sq / (M - 1) - (project1_time / (M - 1)) * (project1_time / (M - 1)));
+  const double project2_time_stddev = std::sqrt(project2_time_sq / (M - 1) - (project2_time / (M - 1)) * (project2_time / (M - 1)));
+  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / (M - 1), project1_time_stddev);
+  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / (M - 1), project2_time_stddev);
   std::cout << "Max errror = " << max_error << std::endl << std::endl;
 }
 
@@ -143,8 +147,10 @@ void run_test_derivatie_cuda(const size_t N = 100000, const int M = 20) {
     cudaMemcpy(h_project1_out, d_project1_out, sizeof(double4), cudaMemcpyDeviceToHost);
     std::chrono::duration<double, std::micro> diff1 = end - start;
     // std::cout << fmt::format("Iteration {}: project1: {} {} {} {}\n", j, h_project1_out->w, h_project1_out->x, h_project1_out->y, h_project1_out->z);
-    project1_time += diff1.count();
-    project1_time_sq += diff1.count() * diff1.count();
+    if (j > 0) {
+      project1_time += diff1.count();
+      project1_time_sq += diff1.count() * diff1.count();
+    }
 
     cudaDeviceSynchronize();
     start = std::chrono::high_resolution_clock::now();
@@ -154,8 +160,10 @@ void run_test_derivatie_cuda(const size_t N = 100000, const int M = 20) {
     cudaMemcpy(h_project2_out, d_project2_out, sizeof(double4), cudaMemcpyDeviceToHost);
     std::chrono::duration<double, std::micro> diff2 = end - start;
     // std::cout << fmt::format("Iteration {}: project2: {} {} {} {}\n", j, h_project2_out->w, h_project2_out->x, h_project2_out->y, h_project2_out->z);
-    project2_time += diff2.count();
-    project2_time_sq += diff2.count() * diff2.count();
+    if (j > 0) {
+      project2_time += diff2.count();
+      project2_time_sq += diff2.count() * diff2.count();
+    }
 
     const double error = std::sqrt(
       (h_project2_out->w - h_project1_out->w) * (h_project2_out->w - h_project1_out->w) +
@@ -173,10 +181,10 @@ void run_test_derivatie_cuda(const size_t N = 100000, const int M = 20) {
   cudaFree(d_project2_out);
   cudaFreeHost(h_project1_out);
   cudaFreeHost(h_project2_out);
-  const double project1_time_stddev = std::sqrt(project1_time_sq / M - (project1_time / M) * (project1_time / M));
-  const double project2_time_stddev = std::sqrt(project2_time_sq / M - (project2_time / M) * (project2_time / M));
-  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / M, project1_time_stddev);
-  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / M, project2_time_stddev);
+  const double project1_time_stddev = std::sqrt(project1_time_sq / (M - 1) - (project1_time / (M - 1)) * (project1_time / (M - 1)));
+  const double project2_time_stddev = std::sqrt(project2_time_sq / (M - 1) - (project2_time / (M - 1)) * (project2_time / (M - 1)));
+  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / (M - 1), project1_time_stddev);
+  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / (M - 1), project2_time_stddev);
   std::cout << "Max errror = " << max_error << std::endl << std::endl;
 }
 

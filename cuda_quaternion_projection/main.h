@@ -129,3 +129,9 @@ void project1_cuda(const rvector* pos1, const rvector* f,
 
 void project2_cuda(const rvector* pos1, const rvector* f,
   const quaternion* q, double4* out, unsigned int num_pos, cudaStream_t stream);
+
+void project1_soa_cuda(const double* pos, const double* f,
+  const quaternion* q, double4* out, unsigned int num_pos, cudaStream_t stream);
+
+void project2_soa_cuda(const double* pos, const double* f,
+  const quaternion* q, double4* out, unsigned int num_pos, cudaStream_t stream);

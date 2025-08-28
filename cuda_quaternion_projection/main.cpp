@@ -180,6 +180,102 @@ void run_test_derivatie_cuda(const size_t N = 100000, const int M = 20) {
   std::cout << "Max errror = " << max_error << std::endl << std::endl;
 }
 
+void run_test_derivatie_cuda_soa(const size_t N = 100000, const int M = 20) {
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+  quaternion q;
+  q.set_from_euler_angles(0.7653981633974483, 0.3, 1.2);
+  std::cout << fmt::format("Running SOA GPU test ({} points, {} iterations):\n", N, M);
+  std::cout << fmt::format("q = ({}, {}, {}, {})\n", q.q0, q.q1, q.q2, q.q3);
+  const size_t soa_size = 3 * N;
+  std::vector<double> points_soa(soa_size), forces_soa(soa_size);
+  double project1_time = 0;
+  double project2_time = 0;
+  double project1_time_sq = 0;
+  double project2_time_sq = 0;
+  double* d_points;
+  double* d_forces;
+  quaternion* d_q;
+  double4* d_project1_out;
+  double4* d_project2_out;
+  double4* h_project1_out;
+  double4* h_project2_out;
+  cudaMalloc(&d_q, sizeof(quaternion));
+  cudaMemcpy(d_q, &q, 1*sizeof(quaternion), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_points, sizeof(double) * soa_size);
+  cudaMalloc(&d_forces, sizeof(double) * soa_size);
+  cudaMalloc(&d_project1_out, sizeof(double4));
+  cudaMalloc(&d_project2_out, sizeof(double4));
+  cudaMallocHost(&h_project1_out, sizeof(double4));
+  cudaMallocHost(&h_project2_out, sizeof(double4));
+  double max_error = 0;
+  for (size_t j = 0; j < M; ++j) {
+    cudaMemset(d_project1_out, 0, sizeof(double4));
+    cudaMemset(d_project2_out, 0, sizeof(double4));
+    std::mt19937 gen(123+j);
+    std::uniform_real_distribution<> dis(-100.0, 100.0);
+    double* points_soa_x = points_soa.data();
+    double* points_soa_y = points_soa_x + N;
+    double* points_soa_z = points_soa_y + N;
+    double* forces_soa_x = forces_soa.data();
+    double* forces_soa_y = forces_soa_x + N;
+    double* forces_soa_z = forces_soa_y + N;
+    for (size_t i = 0; i < N; ++i) {
+      points_soa_x[i] = dis(gen);
+      points_soa_y[i] = dis(gen);
+      points_soa_z[i] = dis(gen);
+      forces_soa_x[i] = dis(gen);
+      forces_soa_y[i] = dis(gen);
+      forces_soa_z[i] = dis(gen);
+    }
+    cudaMemcpy(d_points, points_soa.data(), sizeof(double) * soa_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_forces, forces_soa.data(), sizeof(double) * soa_size, cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::high_resolution_clock::now();
+    project1_soa_cuda(d_points, d_forces, d_q, d_project1_out, N, stream);
+    cudaDeviceSynchronize();
+    auto end = std::chrono::high_resolution_clock::now();
+    cudaMemcpy(h_project1_out, d_project1_out, sizeof(double4), cudaMemcpyDeviceToHost);
+    std::chrono::duration<double, std::micro> diff1 = end - start;
+    // std::cout << fmt::format("Iteration {}: project1: {} {} {} {}\n", j, h_project1_out->w, h_project1_out->x, h_project1_out->y, h_project1_out->z);
+    project1_time += diff1.count();
+    project1_time_sq += diff1.count() * diff1.count();
+
+    cudaDeviceSynchronize();
+    start = std::chrono::high_resolution_clock::now();
+    project2_soa_cuda(d_points, d_forces, d_q, d_project2_out, N, stream);
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    cudaMemcpy(h_project2_out, d_project2_out, sizeof(double4), cudaMemcpyDeviceToHost);
+    std::chrono::duration<double, std::micro> diff2 = end - start;
+    // std::cout << fmt::format("Iteration {}: project2: {} {} {} {}\n", j, h_project2_out->w, h_project2_out->x, h_project2_out->y, h_project2_out->z);
+    project2_time += diff2.count();
+    project2_time_sq += diff2.count() * diff2.count();
+
+    const double error = std::sqrt(
+      (h_project2_out->w - h_project1_out->w) * (h_project2_out->w - h_project1_out->w) +
+      (h_project2_out->x - h_project1_out->x) * (h_project2_out->x - h_project1_out->x) +
+      (h_project2_out->y - h_project1_out->y) * (h_project2_out->y - h_project1_out->y) +
+      (h_project2_out->z - h_project1_out->z) * (h_project2_out->z - h_project1_out->z));
+    if (error > max_error) {
+      max_error = error;
+    }
+  }
+  cudaFree(d_q);
+  cudaFree(d_forces);
+  cudaFree(d_points);
+  cudaFree(d_project1_out);
+  cudaFree(d_project2_out);
+  cudaFreeHost(h_project1_out);
+  cudaFreeHost(h_project2_out);
+  const double project1_time_stddev = std::sqrt(project1_time_sq / M - (project1_time / M) * (project1_time / M));
+  const double project2_time_stddev = std::sqrt(project2_time_sq / M - (project2_time / M) * (project2_time / M));
+  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / M, project1_time_stddev);
+  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / M, project2_time_stddev);
+  std::cout << "Max errror = " << max_error << std::endl << std::endl;
+}
+
 int main() {
   run_test_derivatie_cpu(1000, 20);
   run_test_derivatie_cpu(5000, 20);
@@ -194,5 +290,12 @@ int main() {
   run_test_derivatie_cuda(50000, 50);
   run_test_derivatie_cuda(100000, 50);
   run_test_derivatie_cuda(500000, 50);
+
+  run_test_derivatie_cuda_soa(1000, 50);
+  run_test_derivatie_cuda_soa(5000, 50);
+  run_test_derivatie_cuda_soa(10000, 50);
+  run_test_derivatie_cuda_soa(50000, 50);
+  run_test_derivatie_cuda_soa(100000, 50);
+  run_test_derivatie_cuda_soa(500000, 50);
   return 0;
 }

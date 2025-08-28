@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
+include(CheckIncludeFile)
+project(test_quaternion LANGUAGES CXX)
+
+find_package(CUDAToolkit REQUIRED)
+find_package(fmt REQUIRED)
+include(CheckLanguage)
+check_language(CUDA)
+enable_language(CUDA)
+
+if(NOT DEFINED CMAKE_CUDA_STANDARD)
+  set(CMAKE_CUDA_STANDARD 17)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
+
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES native)
+endif()
+
+add_executable(test_quaternion main.cu main.cpp)
+target_link_libraries(test_quaternion CUDA::cudart CUDA::nvtx3 fmt)
+set_property(TARGET test_quaternion PROPERTY LANGUAGE CUDA)

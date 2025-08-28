@@ -36,17 +36,17 @@ auto project2(const quaternion& q, const std::vector<rvector>& pos, const std::v
   return q.derivative_element_wise_product_sum(C);
 }
 
-void run_test_derivatie_cpu() {
+void run_test_derivatie_cpu(const size_t N = 100000, const int M = 20) {
   quaternion q;
   q.set_from_euler_angles(0.7653981633974483, 0.3, 1.2);
-  const size_t N = 100000;
-  const int M = 20;
   std::cout << fmt::format("Running CPU test ({} points, {} iterations):\n", N, M);
   std::cout << fmt::format("q = ({}, {}, {}, {})\n", q.q0, q.q1, q.q2, q.q3);
   std::vector<rvector> points(N), forces(N);
   // std::random_device rd;
   double project1_time = 0;
   double project2_time = 0;
+  double project1_time_sq = 0;
+  double project2_time_sq = 0;
   double max_error = 0;
   for (size_t j = 0; j < M; ++j) {
     std::mt19937 gen(123+j);
@@ -65,6 +65,7 @@ void run_test_derivatie_cpu() {
     std::chrono::duration<double, std::micro> diff1 = end - start;
     // std::cout << fmt::format("Iteration {}: project1: {} {} {} {}\n", j, dq1[0], dq1[1], dq1[2], dq1[3]);
     project1_time += diff1.count();
+    project1_time_sq += diff1.count() * diff1.count();
 
     start = std::chrono::high_resolution_clock::now();
     const auto dq2 = project2(q, points, forces);
@@ -72,6 +73,7 @@ void run_test_derivatie_cpu() {
     std::chrono::duration<double, std::micro> diff2 = end - start;
     // std::cout << fmt::format("Iteration {}: Project2: {} {} {} {}\n", j, dq2[0], dq2[1], dq2[2], dq2[3]);
     project2_time += diff2.count();
+    project2_time_sq += diff2.count() * diff2.count();
 
     const double error = std::sqrt(
       (dq1[0] - dq2[0]) * (dq1[0] - dq2[0]) +
@@ -82,23 +84,25 @@ void run_test_derivatie_cpu() {
       max_error = error;
     }
   }
-  std::cout << "Project1 average running time: " << project1_time / M << std::endl;
-  std::cout << "Project2 average running time: " << project2_time / M << std::endl;
-  std::cout << "Max errror = " << max_error << std::endl;
+  const double project1_time_stddev = std::sqrt(project1_time_sq / M - (project1_time / M) * (project1_time / M));
+  const double project2_time_stddev = std::sqrt(project2_time_sq / M - (project2_time / M) * (project2_time / M));
+  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / M, project1_time_stddev);
+  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / M, project2_time_stddev);
+  std::cout << "Max errror = " << max_error << std::endl << std::endl;
 }
 
-void run_test_derivatie_cuda() {
+void run_test_derivatie_cuda(const size_t N = 100000, const int M = 20) {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
   quaternion q;
   q.set_from_euler_angles(0.7653981633974483, 0.3, 1.2);
-  const size_t N = 100000;
-  const int M = 20;
   std::cout << fmt::format("Running GPU test ({} points, {} iterations):\n", N, M);
   std::cout << fmt::format("q = ({}, {}, {}, {})\n", q.q0, q.q1, q.q2, q.q3);
   std::vector<rvector> points(N), forces(N);
   double project1_time = 0;
   double project2_time = 0;
+  double project1_time_sq = 0;
+  double project2_time_sq = 0;
   rvector* d_points;
   rvector* d_forces;
   quaternion* d_q;
@@ -140,6 +144,7 @@ void run_test_derivatie_cuda() {
     std::chrono::duration<double, std::micro> diff1 = end - start;
     // std::cout << fmt::format("Iteration {}: project1: {} {} {} {}\n", j, h_project1_out->w, h_project1_out->x, h_project1_out->y, h_project1_out->z);
     project1_time += diff1.count();
+    project1_time_sq += diff1.count() * diff1.count();
 
     cudaDeviceSynchronize();
     start = std::chrono::high_resolution_clock::now();
@@ -150,6 +155,7 @@ void run_test_derivatie_cuda() {
     std::chrono::duration<double, std::micro> diff2 = end - start;
     // std::cout << fmt::format("Iteration {}: project2: {} {} {} {}\n", j, h_project2_out->w, h_project2_out->x, h_project2_out->y, h_project2_out->z);
     project2_time += diff2.count();
+    project2_time_sq += diff2.count() * diff2.count();
 
     const double error = std::sqrt(
       (h_project2_out->w - h_project1_out->w) * (h_project2_out->w - h_project1_out->w) +
@@ -167,13 +173,26 @@ void run_test_derivatie_cuda() {
   cudaFree(d_project2_out);
   cudaFreeHost(h_project1_out);
   cudaFreeHost(h_project2_out);
-  std::cout << "Project1 average running time: " << project1_time / M << std::endl;
-  std::cout << "Project2 average running time: " << project2_time / M << std::endl;
-  std::cout << "Max errror = " << max_error << std::endl;
+  const double project1_time_stddev = std::sqrt(project1_time_sq / M - (project1_time / M) * (project1_time / M));
+  const double project2_time_stddev = std::sqrt(project2_time_sq / M - (project2_time / M) * (project2_time / M));
+  std::cout << fmt::format("Project1 average running time: {:10.3f} ± {:.3f} µs.\n", project1_time / M, project1_time_stddev);
+  std::cout << fmt::format("Project2 average running time: {:10.3f} ± {:.3f} µs.\n", project2_time / M, project2_time_stddev);
+  std::cout << "Max errror = " << max_error << std::endl << std::endl;
 }
 
 int main() {
-  run_test_derivatie_cpu();
-  run_test_derivatie_cuda();
+  run_test_derivatie_cpu(1000, 20);
+  run_test_derivatie_cpu(5000, 20);
+  run_test_derivatie_cpu(10000, 20);
+  run_test_derivatie_cpu(50000, 20);
+  run_test_derivatie_cpu(100000, 20);
+  run_test_derivatie_cpu(500000, 20);
+
+  run_test_derivatie_cuda(1000, 50);
+  run_test_derivatie_cuda(5000, 50);
+  run_test_derivatie_cuda(10000, 50);
+  run_test_derivatie_cuda(50000, 50);
+  run_test_derivatie_cuda(100000, 50);
+  run_test_derivatie_cuda(500000, 50);
   return 0;
 }
